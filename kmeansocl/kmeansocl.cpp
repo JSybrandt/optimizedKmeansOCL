@@ -792,7 +792,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     return result;
 }
 
-void generateInput(cl_float3* inputArray, cl_uint array wid, cl_uint height){
+void generateInput(cl_float3* inputArray, cl_uint array Width, cl_uint height){
 
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Initialise();
@@ -800,19 +800,19 @@ void generateInput(cl_float3* inputArray, cl_uint array wid, cl_uint height){
 
 	char * file_in = "test.jpg";
 
-	fipImage img;
+	fipImage input;
 
 	if (!input.load(file_in)){
-		std::cout<<"error loading" << file_in<<endl;
+		std::cout<<"error loading" << file_in<<std::endl;
 		system("pause");
-		exit();
+		exit(0);
 	}
 
-	FREE_IMAGETYPE originalType = input.getImageType();
-	if (!image.convertTo32Bits()){
-		std::cout<<"error loading" << file_in<<endl;
+	FREE_IMAGE_TYPE originalType = input.getImageType();
+	if (!input.convertTo32Bits()){
+		std::cout<<"error loading" << file_in<<std::endl;
 		system("pause");
-		exit();
+		exit(0);
 	}
 
 	pixels.resize(input.getWidth() * input.getHeight());
@@ -826,7 +826,7 @@ void generateInput(cl_float3* inputArray, cl_uint array wid, cl_uint height){
 			temp.y = colors[1];
 			temp.z = colors[2];
 
-			pixels[j * input.getWidth() + i]
+			pixels[j * input.getWidth() + i];
 		}
 	}
 
@@ -917,7 +917,7 @@ int _tmain(int argc, TCHAR* argv[])
     // because this call doesn't guarantees that kernel is finished.
     // clEnqueueNDRangeKernel is just enqueue new command in OpenCL command queue and doesn't wait until it ends.
     // clFinish waits until all commands in command queue are finished, that suits your need to measure time.
-    bool queueProfilingEnable = true;
+    bool queueProfilingEnable = false;
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
     // Execute (enqueue) the kernel
