@@ -32,10 +32,10 @@
     <ClInclude Include="kmeansocl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FreeImagePlus.h">
+    <ClInclude Include="FreeImage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FreeImage.h">
+    <ClInclude Include="FreeImagePlus.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
