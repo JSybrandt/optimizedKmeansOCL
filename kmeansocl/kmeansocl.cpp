@@ -35,9 +35,31 @@
 #include <Windows.h>
 
 
+#include <random>
+#include <chrono>
+#include <iostream>
+#include <math.h>
+
 // Macros for OpenCL versions
 #define OPENCL_VERSION_1_2  1.2f
 #define OPENCL_VERSION_2_0  2.0f
+
+//hardcode centroid count here
+const int CENTROID_COUNT = 3;
+
+//structs...centroid and pixel
+struct centroid {
+	float r;
+	float g;
+	float b;
+};
+
+struct pixel {
+	float r;
+	float g;
+	float b;
+	int cluster;
+};
 
 /* This function helps to create informative messages in
  * case when OpenCL errors occur. It returns a string
@@ -771,19 +793,24 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
 }
 
 void generateInput(cl_float3* inputArray, cl_uint array wid, cl_uint height){
+
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Initialise();
+	#endif
+
 	char * file_in = "test.jpg";
 
 	fipImage img;
 
 	if (!input.load(file_in)){
-		cout<<"error loading" << file_in<<endl;
+		std::cout<<"error loading" << file_in<<endl;
 		system("pause");
 		exit();
 	}
 
-	FREE_IMAGETYPE originalType = input.getImageType()
+	FREE_IMAGETYPE originalType = input.getImageType();
 	if (!image.convertTo32Bits()){
-		cout<<"error loading" << file_in<<endl;
+		std::cout<<"error loading" << file_in<<endl;
 		system("pause");
 		exit();
 	}
@@ -792,15 +819,20 @@ void generateInput(cl_float3* inputArray, cl_uint array wid, cl_uint height){
 	for(unsigned int i = 0; i< input.getWidth(); ++i){
 		for(unsigned int j = 0;j<input.getHeight(); ++j){
 			cl_float3 temp;
+			pixel temp;
 			byte colors[4];
-			input.getPixelColor(i, j, reinterpret_cast<RGBQuad*>(colors));
-			temp.x = colors[0]
-			temp.y = colors[1]
-			temp.z = colors[2]
+			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
+			temp.x = colors[0];
+			temp.y = colors[1];
+			temp.z = colors[2];
 
 			pixels[j * input.getWidth() + i]
 		}
 	}
+
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Uninitialise();
+	#endif
 }
 
 
