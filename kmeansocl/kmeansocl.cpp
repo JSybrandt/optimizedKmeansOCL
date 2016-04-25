@@ -792,7 +792,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     return result;
 }
 
-void generateInput(cl_float3* inputArray, cl_uint array Width, cl_uint height){
+void generateInput(cl_float3* inputArray , cl_uint arrayWidth, cl_uint arrayHeight){
 
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Initialise();
@@ -815,6 +815,8 @@ void generateInput(cl_float3* inputArray, cl_uint array Width, cl_uint height){
 		exit(0);
 	}
 
+	//load original image pixel data
+	std::vector<pixel> pixels;
 	pixels.resize(input.getWidth() * input.getHeight());
 	for(unsigned int i = 0; i< input.getWidth(); ++i){
 		for(unsigned int j = 0;j<input.getHeight(); ++j){

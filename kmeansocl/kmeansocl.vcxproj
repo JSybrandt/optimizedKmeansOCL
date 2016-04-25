@@ -186,6 +186,8 @@
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FreeImage.h" />
+    <ClInclude Include="FreeImagePlus.h" />
     <ClInclude Include="kmeansocl.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
