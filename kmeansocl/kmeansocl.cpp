@@ -792,7 +792,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     return result;
 }
 
-void generateInput(cl_float3* inputArray , cl_uint arrayWidth, cl_uint arrayHeight){
+std::vector<cl_float3> loadImage(){
 
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Initialise();
@@ -809,19 +809,18 @@ void generateInput(cl_float3* inputArray , cl_uint arrayWidth, cl_uint arrayHeig
 	}
 
 	FREE_IMAGE_TYPE originalType = input.getImageType();
-	if (!input.convertTo32Bits()){
+	if (!input.convertTo24Bits()){
 		std::cout<<"error loading" << file_in<<std::endl;
 		system("pause");
 		exit(0);
 	}
 
 	//load original image pixel data
-	std::vector<pixel> pixels;
+	std::vector<cl_float3> pixels;
 	pixels.resize(input.getWidth() * input.getHeight());
 	for(unsigned int i = 0; i< input.getWidth(); ++i){
 		for(unsigned int j = 0;j<input.getHeight(); ++j){
 			cl_float3 temp;
-			pixel temp;
 			byte colors[4];
 			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
 			temp.x = colors[0];
@@ -835,6 +834,8 @@ void generateInput(cl_float3* inputArray , cl_uint arrayWidth, cl_uint arrayHeig
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Uninitialise();
 	#endif
+
+	return pixels;
 }
 
 
