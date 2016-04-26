@@ -482,40 +482,15 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
 /*
  * Generate random value for input buffers
  */
-void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
+void generateInput(fipImage& input, cl_float4* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
 {
-    srand(12345);
-
-    // random initialization of input
-    cl_uint array_size = arrayWidth * arrayHeight;
-    for (cl_uint i = 0; i < array_size; ++i)
-    {
-        inputArray[i] = rand();
-    }
 
 	std::vector<centroid> centroids(CENTROID_COUNT);
 	std::vector<pixel> pixels;
-	fipImage input;
 
 	char * file_in = "test.jpg";
 
-	//generate centroids randomly
-	std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
-	std::uniform_real_distribution<float> distro(0.0f, 1.0f);
-	for(int i = 0; i < CENTROID_COUNT; ++i) {
-		centroid temp;
-		temp.r = distro(generator);
-		temp.g = distro(generator);
-		temp.b = distro(generator);
-
-		centroids[i] = temp;
-	}
-
 	//LOAD IMAGE DATA
-
-	#ifdef FREEIMAGE_LIB
-	FreeImage_Initialise();
-	#endif
 
 	if (!input.load(file_in)){
 		std::cout<<"error loading" << file_in<<std::endl;
@@ -534,23 +509,33 @@ void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
 	pixels.resize(input.getWidth() * input.getHeight());
 	for(unsigned int i = 0; i< input.getWidth(); ++i){
 		for(unsigned int j = 0;j<input.getHeight(); ++j){
-			cl_float3 temp;
+			cl_float4 temp;
 			byte colors[4];
 			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
 			temp.x = colors[0];
 			temp.y = colors[1];
 			temp.z = colors[2];
-
-			pixels[j * input.getWidth() + i];
+			temp.w = -1;
+			inputArray[j*arrayWidth + i] = temp;
 		}
 	}
 
-	#ifdef FREEIMAGE_LIB
-	FreeImage_Uninitialise();
-	#endif
-
 }
 
+
+void generateCentroids(cl_float3* inputB, int numCentroids){
+	//generate centroids randomly
+	std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
+	std::uniform_real_distribution<float> distro(0.0f, 1.0f);
+	for(int i = 0; i < CENTROID_COUNT; ++i) {
+		cl_float3 temp;
+		temp.x = distro(generator);
+		temp.y = distro(generator);
+		temp.z = distro(generator);
+
+		inputB[i] = temp;
+	}
+}
 
 /*
  * This function picks/creates necessary OpenCL objects which are needed.
@@ -699,7 +684,7 @@ Finish:
  * Create OpenCL buffers from host memory
  * These buffers will be used later by the OpenCL kernel
  */
-int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_int* outputC, cl_uint arrayWidth, cl_uint arrayHeight)
+int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* inputB, cl_float4* outputC, cl_uint arrayWidth, cl_uint arrayHeight)
 {
     cl_int err = CL_SUCCESS;
 
@@ -802,53 +787,49 @@ cl_uint ExecuteKmeansKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
 }
 
 
-/*
- * "Read" the result buffer (mapping the buffer to the host memory address)
- */
-bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inputA, cl_int *inputB)
-{
-    cl_int err = CL_SUCCESS;
-    bool result = true;
-
-    // Enqueue a command to map the buffer object (ocl->dstMem) into the host address space and returns a pointer to it
-    // The map operation is blocking
-    cl_int *resultPtr = (cl_int *)clEnqueueMapBuffer(ocl->commandQueue, ocl->dstMem, true, CL_MAP_READ, 0, sizeof(cl_uint) * width * height, 0, NULL, NULL, &err);
-
-    if (CL_SUCCESS != err)
-    {
-        LogError("Error: clEnqueueMapBuffer returned %s\n", TranslateOpenCLError(err));
-        return false;
-    }
-
-    // Call clFinish to guarantee that output region is updated
-    err = clFinish(ocl->commandQueue);
-    if (CL_SUCCESS != err)
-    {
-        LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
-    }
-
-    // We mapped dstMem to resultPtr, so resultPtr is ready and includes the kernel output !!!
-    // Verify the results
-    unsigned int size = width * height;
-    for (unsigned int k = 0; k < size; ++k)
-    {
-        if (resultPtr[k] != inputA[k] + inputB[k])
-        {
-            LogError("Verification failed at %d: (%d + %d = %d)\n", k, inputA[k], inputB[k], resultPtr[k]);
-            result = false;
-        }
-    }
-
-     // Unmapped the output buffer before releasing it
-    err = clEnqueueUnmapMemObject(ocl->commandQueue, ocl->dstMem, resultPtr, 0, NULL, NULL);
-    if (CL_SUCCESS != err)
-    {
-        LogError("Error: clEnqueueUnmapMemObject returned %s\n", TranslateOpenCLError(err));
-    }
-
-    return result;
+void moveCentroids(cl_float4* pixels, cl_float3* centroids, int arrayWidth, int arrayHeight){
+	int count[CENTROID_COUNT];
+	cl_float3 valueSum[CENTROID_COUNT];
+	//init
+	for(int i = 0 ; i < CENTROID_COUNT; i++){ 
+		count[i]=0;
+		valueSum[i].x=valueSum[i].y=valueSum[i].z=0;
+	}
+	//for each pixel
+	for(int i = 0; i<arrayWidth*arrayHeight; ++i){
+		//this pixel's label
+		int c = pixels[i].w;
+		//tally
+		count[c]++;
+		//sum value
+		valueSum[c].x +=  pixels[i].x;
+		valueSum[c].y +=  pixels[i].y;
+		valueSum[c].z +=  pixels[i].z;
+	}
+	//move centroids
+	for(int i = 0 ; i < CENTROID_COUNT; i++){ 
+		centroids[i].x = valueSum[i].x / count[i];
+		centroids[i].y = valueSum[i].y / count[i];
+		centroids[i].z = valueSum[i].z / count[i];
+	}
 }
 
+bool convergence(cl_float3* group1, cl_float3* group2){
+	for(int i = 0 ; i < CENTROID_COUNT; ++i){
+		if(abs(group1[i].x - group2[i].x) > 0.0000001) return false;
+		if(abs(group1[i].y - group2[i].y) > 0.0000001) return false;
+		if(abs(group1[i].z - group2[i].z) > 0.0000001) return false;
+	}
+	return true;
+}
+
+void assignFinalPixelColors(cl_float4* pixels, cl_float3* centroids, int arrayWidth, int arrayHeight){
+	for (int i = 0;i<arrayWidth*arrayHeight;i++){
+		pixels[i].x = centroids[(int)pixels[i].w].x;
+		pixels[i].y = centroids[(int)pixels[i].w].y;
+		pixels[i].z = centroids[(int)pixels[i].w].z;
+	}
+}
 
 /*
  * main execution routine
@@ -859,6 +840,12 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
  */
 int _tmain(int argc, TCHAR* argv[])
 {
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Initialise();
+	#endif
+
+	fipImage inputImg;
+
     cl_int err;
     ocl_args_d_t ocl;
     cl_device_type deviceType = CL_DEVICE_TYPE_CPU;
@@ -878,10 +865,11 @@ int _tmain(int argc, TCHAR* argv[])
 
     // allocate working buffers. 
     // the buffer should be aligned with 4K page and size should fit 64-byte cached line
-    cl_uint optimizedSize = ((sizeof(cl_int) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
-    cl_int* inputA  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
-    cl_int* inputB  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
-    cl_int* outputC = (cl_int*)_aligned_malloc(optimizedSize, 4096);
+    cl_uint optimizedSizeA = ((sizeof(cl_float4) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
+	cl_uint optimizedSizeB = ((sizeof(cl_float3) * CENTROID_COUNT - 1)/64 + 1) * 64;
+    cl_float4* inputA  = (cl_float4*)_aligned_malloc(optimizedSizeA, arrayHeight*arrayWidth*sizeof(cl_float4));//pixels
+    cl_float3* inputB  = (cl_float3*)_aligned_malloc(optimizedSizeB, CENTROID_COUNT*sizeof(cl_float3));//centroids
+    cl_float4* outputC = (cl_float4*)_aligned_malloc(optimizedSizeA, arrayHeight*arrayWidth*sizeof(cl_float4));
     if (NULL == inputA || NULL == inputB || NULL == outputC)
     {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
@@ -889,8 +877,8 @@ int _tmain(int argc, TCHAR* argv[])
     }
 
     //random input
-    generateInput(inputA, arrayWidth, arrayHeight);
-    generateInput(inputB, arrayWidth, arrayHeight);
+    generateInput(inputImg,inputA, arrayWidth, arrayHeight);
+    generateCentroids(inputB, CENTROID_COUNT);
 
     // Create OpenCL buffers from host memory
     // These buffers will be used later by the OpenCL kernel
@@ -908,7 +896,7 @@ int _tmain(int argc, TCHAR* argv[])
     // Program consists of kernels.
     // Each kernel can be called (enqueued) from the host part of OpenCL application.
     // To call the kernel, you need to create it from existing program.
-    ocl.kernel = clCreateKernel(ocl.program, "Add", &err);
+    ocl.kernel = clCreateKernel(ocl.program, "Label", &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateKernel returned %s\n", TranslateOpenCLError(err));
@@ -934,17 +922,34 @@ int _tmain(int argc, TCHAR* argv[])
     bool queueProfilingEnable = false;
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
-    // Execute (enqueue) the kernel
-    if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
-    {
-        return -1;
-    }
+
+	cl_float3 oldCentroids[CENTROID_COUNT];
+	do{
+		for(int i = 0 ; i < CENTROID_COUNT; i++)
+			oldCentroids[i] = inputB[i];
+
+		 // Execute (enqueue) the kernel (labels)
+		if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
+		{
+			return -1;
+		}
+		//copy results of labeling
+		for(int i = 0 ; i < arrayWidth*arrayHeight; ++i)
+			inputA[i] = outputC[i];
+
+		moveCentroids(inputA,inputB,arrayWidth,arrayHeight);
+
+	}while(!convergence(inputB,oldCentroids));
+
+
+   
+
+
+
+
+
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStop);
-
-    // The last part of this function: getting processed results back.
-    // use map-unmap sequence to update original memory area with output buffer.
-    ReadAndVerify(&ocl, arrayWidth, arrayHeight, inputA, inputB);
 
     // retrieve performance counter frequency
     if (queueProfilingEnable)
@@ -954,9 +959,40 @@ int _tmain(int argc, TCHAR* argv[])
             1000.0f*(float)(performanceCountNDRangeStop.QuadPart - performanceCountNDRangeStart.QuadPart) / (float)perfFrequency.QuadPart);
     }
 
+	assignFinalPixelColors(inputA, inputB, arrayWidth,arrayHeight);
+
+	//write image
+	//allocate output image
+	fipImage output(FIT_BITMAP, inputImg.getWidth(), inputImg.getHeight(), 24);
+
+	for(unsigned int i = 0; i < output.getWidth(); ++i) {
+		for(unsigned int j = 0; j < output.getHeight(); ++j) {
+			byte colors[4];
+			colors[0] = static_cast<byte>(inputA[j * output.getWidth() + i].z * 255);
+			colors[1] = static_cast<byte>(inputA[j * output.getWidth() + i].y * 255);
+			colors[2] = static_cast<byte>(inputA[j * output.getWidth() + i].x * 255);
+			
+			output.setPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
+		}
+	}
+
+	if(!output.convertToType(inputImg.getImageType())) {
+		std::cout << "Could not convert back to 24 bits for image saving." << std::endl;
+		return 1;
+	}
+
+	if(!output.save("test_result.jpg")) {
+		std::cout << "Something went wrong with filesaving" << std::endl;
+		return 1;
+	}
+
     _aligned_free(inputA);
     _aligned_free(inputB);
     _aligned_free(outputC);
+
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Uninitialise();
+	#endif
 
     return 0;
 }
