@@ -24,23 +24,32 @@
 	return sqrt(pow(p.x-c.x,2)+pow(p.y-c.y,2)+pow(p.z-c.z,2));
 }
 
-__kernel void Kmeans(__global float4* pA, __local float3* pB, __global float4* pC)
+__kernel void Kmeans(__global float4* pA, __global float3* pB, __global float4* pC)
 {
 	const int CENTROID_COUNT = 5;
     const int x     = get_global_id(0);
     const int y     = get_global_id(1);
     const int width = get_global_size(0);
-	float4 currPix;
     const int id = y * width + x;
+
+	local float3 centroids[5];
+	centroids[0] = pB[0];
+	centroids[1] = pB[1];
+	centroids[2] = pB[2];
+	centroids[3] = pB[3];
+	centroids[4] = pB[4];
+	float4 currPix = pA[id];
+
 	int i = 0;
-	float minVal = 4*255;
+	float minVal = 9999;
 	float3 c;
 	float d;
-	currPix = pA[id];
+	
+	
 
 
-	for(i = 0 ; i < CENTROID_COUNT; i++){
-		c =  pB[i];
+	for(i; i < CENTROID_COUNT; i++){
+		c =  centroids[i];
 		d = dist(currPix,c);
 		if(minVal > d){
 			minVal = d;
