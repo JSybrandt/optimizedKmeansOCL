@@ -485,9 +485,6 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
 void generateInput(fipImage& input, cl_float4* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
 {
 
-	std::vector<centroid> centroids(CENTROID_COUNT);
-	std::vector<pixel> pixels;
-
 	char * file_in = "test.jpg";
 
 	//LOAD IMAGE DATA
@@ -506,17 +503,14 @@ void generateInput(fipImage& input, cl_float4* inputArray, cl_uint arrayWidth, c
 	}
 
 	//load original image pixel data
-	pixels.resize(input.getWidth() * input.getHeight());
 	for(unsigned int i = 0; i< input.getWidth(); ++i){
 		for(unsigned int j = 0;j<input.getHeight(); ++j){
-			cl_float4 temp;
 			byte colors[4];
 			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
-			temp.x = colors[0];
-			temp.y = colors[1];
-			temp.z = colors[2];
-			temp.w = -1;
-			inputArray[j*arrayWidth + i] = temp;
+			inputArray[j*input.getWidth()+i].x = colors[0]/ 255.0f;;
+			inputArray[j*input.getWidth()+i].y = colors[1]/ 255.0f;;
+			inputArray[j*input.getWidth()+i].z = colors[2]/ 255.0f;;
+			inputArray[j*input.getWidth()+i].w = -1;
 		}
 	}
 
@@ -694,14 +688,14 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* input
     // to better organize data copying.
     // You use CL_MEM_COPY_HOST_PTR here, because the buffers should be populated with bytes at inputA and inputB.
 
-    ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, inputA, &err);
+    ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_float4) * arrayWidth * arrayHeight, inputA, &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateBuffer for srcA returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, inputB, &err);
+    ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_float3) * CENTROID_COUNT, inputB, &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateBuffer for srcB returned %s\n", TranslateOpenCLError(err));
@@ -712,7 +706,7 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* input
     // then, depending on the OpenCL runtime implementation and hardware capabilities, 
     // it may save you not necessary data copying.
     // As it is known that output buffer will be write only, you explicitly declare it using CL_MEM_WRITE_ONLY.
-    ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, outputC, &err);
+    ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float4) * arrayWidth * arrayHeight, outputC, &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateBuffer for dstMem returned %s\n", TranslateOpenCLError(err));
@@ -875,8 +869,7 @@ int _tmain(int argc, TCHAR* argv[])
 
     cl_float4* inputA  = (cl_float4*)_aligned_malloc(optimizedSizeA,4096);//pixels
     cl_float3* inputB  = (cl_float3*)_aligned_malloc(optimizedSizeB,4096);//centroids
-    cl_float4* outputC = (cl_float4*)_aligned_malloc(optimizedSizeA,4096);
-    if (NULL == inputA || NULL == inputB || NULL == outputC)
+    if (NULL == inputA || NULL == inputB)
     {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
         return -1;
@@ -886,9 +879,10 @@ int _tmain(int argc, TCHAR* argv[])
     generateInput(inputImg,inputA, arrayWidth, arrayHeight);
     generateCentroids(inputB, CENTROID_COUNT);
 
+
     // Create OpenCL buffers from host memory
     // These buffers will be used later by the OpenCL kernel
-    if (CL_SUCCESS != CreateBufferArguments(&ocl, inputA, inputB, outputC, arrayWidth, arrayHeight))
+    if (CL_SUCCESS != CreateBufferArguments(&ocl, inputA, inputB, inputA, arrayWidth, arrayHeight))
     {
         return -1;
     }
@@ -939,9 +933,6 @@ int _tmain(int argc, TCHAR* argv[])
 		{
 			return -1;
 		}
-		//copy results of labeling
-		for(int i = 0 ; i < arrayWidth*arrayHeight; ++i)
-			inputA[i] = outputC[i];
 
 		moveCentroids(inputA,inputB,arrayWidth,arrayHeight);
 
@@ -994,7 +985,6 @@ int _tmain(int argc, TCHAR* argv[])
 
     _aligned_free(inputA);
     _aligned_free(inputB);
-    _aligned_free(outputC);
 
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Uninitialise();
