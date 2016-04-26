@@ -26,7 +26,7 @@
 
 __kernel void Kmeans(__global float4* pA, __global float3* pB, __global float4* pC)
 {
-	const int CENTROID_COUNT = 3;
+	const int CENTROID_COUNT = 5;
     const int x     = get_global_id(0);
     const int y     = get_global_id(1);
     const int width = get_global_size(0);

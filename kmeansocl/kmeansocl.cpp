@@ -45,7 +45,7 @@
 #define OPENCL_VERSION_2_0  2.0f
 
 //hardcode centroid count here
-const int CENTROID_COUNT = 3;
+const int CENTROID_COUNT = 5;
 
 //structs...centroid and pixel
 struct centroid {
