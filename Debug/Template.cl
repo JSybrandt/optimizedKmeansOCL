@@ -30,17 +30,20 @@ __kernel void Kmeans(__global float4* pA, __global float3* pB, __global float4* 
 
     const int id = y * width + x;
 
-	__local float3 centroids[3];
-	int i;
-	for(i = 0 ; i < CENTROID_COUNT; i++)
-		centroids[i] = pB[i]; //load centroids to local
-
+	
 	float4 currPix = pA[id];
+	currPix.w = 1;
+	return;
+	pC[id] = currPix;
 
+	return;
+
+	int i = 0;
+	
 	float minVal = 4*255;
 
 	for(i = 0 ; i < CENTROID_COUNT; i++){
-		float3 c = centroids[i];
+		float3 c =  pB[i];
 		float d = (currPix.x - c.x) + (currPix.y-c.y) + (currPix.z-c.z);
 		if(minVal > d){
 			minVal = d;

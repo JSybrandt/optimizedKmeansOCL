@@ -865,11 +865,17 @@ int _tmain(int argc, TCHAR* argv[])
 
     // allocate working buffers. 
     // the buffer should be aligned with 4K page and size should fit 64-byte cached line
-    cl_uint optimizedSizeA = ((sizeof(cl_float4) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
-	cl_uint optimizedSizeB = ((sizeof(cl_float3) * CENTROID_COUNT - 1)/64 + 1) * 64;
-    cl_float4* inputA  = (cl_float4*)_aligned_malloc(optimizedSizeA, arrayHeight*arrayWidth*sizeof(cl_float4));//pixels
-    cl_float3* inputB  = (cl_float3*)_aligned_malloc(optimizedSizeB, CENTROID_COUNT*sizeof(cl_float3));//centroids
-    cl_float4* outputC = (cl_float4*)_aligned_malloc(optimizedSizeA, arrayHeight*arrayWidth*sizeof(cl_float4));
+	//size for pixels
+    cl_uint optimizedSizeA =  ((sizeof(cl_float4) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
+	//size for centroids
+	cl_uint optimizedSizeB =  ((sizeof(cl_float3) * CENTROID_COUNT - 1)/64 + 1) * 64;
+
+	//for(optimizedSizeA; optimizedSizeA < sizeof(cl_float4) * arrayWidth * arrayHeight; optimizedSizeA*=2);
+	//for(optimizedSizeB; optimizedSizeB < sizeof(cl_float3) * CENTROID_COUNT; optimizedSizeB*=21);
+
+    cl_float4* inputA  = (cl_float4*)_aligned_malloc(optimizedSizeA,4096);//pixels
+    cl_float3* inputB  = (cl_float3*)_aligned_malloc(optimizedSizeB,4096);//centroids
+    cl_float4* outputC = (cl_float4*)_aligned_malloc(optimizedSizeA,4096);
     if (NULL == inputA || NULL == inputB || NULL == outputC)
     {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
@@ -896,7 +902,7 @@ int _tmain(int argc, TCHAR* argv[])
     // Program consists of kernels.
     // Each kernel can be called (enqueued) from the host part of OpenCL application.
     // To call the kernel, you need to create it from existing program.
-    ocl.kernel = clCreateKernel(ocl.program, "Label", &err);
+    ocl.kernel = clCreateKernel(ocl.program, "Kmeans", &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateKernel returned %s\n", TranslateOpenCLError(err));
