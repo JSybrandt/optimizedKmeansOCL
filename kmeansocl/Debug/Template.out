@@ -5,7 +5,7 @@ Device version: OpenCL 1.2 (Build 57)
 Device vendor: Intel(R) Corporation
 Device profile: FULL_PROFILE
 Compilation started
-C:\Users\bowmanrs1\kmeansocl\kmeansocl\Template.cl(51,6) :warning CL : expression result unused
+C:\Users\bowmanrs1\kmeansocl\kmeansocl\Template.cl(45,6) :warning CL : expression result unused
 Compilation done
 Linking started
 Linking done

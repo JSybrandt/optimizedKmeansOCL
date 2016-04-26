@@ -40,26 +40,17 @@ __kernel void Kmeans(__global float4* pA, __global float3* pB, __global float4* 
 	centroids[4] = pB[4];
 	float4 currPix = pA[id];
 
-	int i = 0;
 	float minVal = 9999;
-	float3 c;
-	float d;
-	
-	
-
-
+	int i = 0;
 	for(i; i < CENTROID_COUNT; i++){
-		c =  centroids[i];
-		d = dist(currPix,c);
-		if(minVal > d){
-			minVal = d;
+		float currDist = dist(currPix,centroids[i]);
+		if(minVal > currDist){
+			minVal = currDist;
 			currPix.w = i;
 		 }
 	}
 
 	pC[id]=currPix;
-	
-
 }
 
 
