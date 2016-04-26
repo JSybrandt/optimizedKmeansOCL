@@ -492,6 +492,63 @@ void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
     {
         inputArray[i] = rand();
     }
+
+	std::vector<centroid> centroids(CENTROID_COUNT);
+	std::vector<pixel> pixels;
+	fipImage input;
+
+	char * file_in = "test.jpg";
+
+	//generate centroids randomly
+	std::mt19937 generator(std::chrono::system_clock::now().time_since_epoch().count());
+	std::uniform_real_distribution<float> distro(0.0f, 1.0f);
+	for(int i = 0; i < CENTROID_COUNT; ++i) {
+		centroid temp;
+		temp.r = distro(generator);
+		temp.g = distro(generator);
+		temp.b = distro(generator);
+
+		centroids[i] = temp;
+	}
+
+	//LOAD IMAGE DATA
+
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Initialise();
+	#endif
+
+	if (!input.load(file_in)){
+		std::cout<<"error loading" << file_in<<std::endl;
+		system("pause");
+		exit(0);
+	}
+
+	FREE_IMAGE_TYPE originalType = input.getImageType();
+	if (!input.convertTo24Bits()){
+		std::cout<<"error loading" << file_in<<std::endl;
+		system("pause");
+		exit(0);
+	}
+
+	//load original image pixel data
+	pixels.resize(input.getWidth() * input.getHeight());
+	for(unsigned int i = 0; i< input.getWidth(); ++i){
+		for(unsigned int j = 0;j<input.getHeight(); ++j){
+			cl_float3 temp;
+			byte colors[4];
+			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
+			temp.x = colors[0];
+			temp.y = colors[1];
+			temp.z = colors[2];
+
+			pixels[j * input.getWidth() + i];
+		}
+	}
+
+	#ifdef FREEIMAGE_LIB
+	FreeImage_Uninitialise();
+	#endif
+
 }
 
 
@@ -717,7 +774,7 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl)
 /*
  * Execute the kernel
  */
-cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
+cl_uint ExecuteKmeansKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
 {
     cl_int err = CL_SUCCESS;
 
@@ -792,52 +849,6 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     return result;
 }
 
-std::vector<cl_float3> loadImage(){
-
-	#ifdef FREEIMAGE_LIB
-	FreeImage_Initialise();
-	#endif
-
-	char * file_in = "test.jpg";
-
-	fipImage input;
-
-	if (!input.load(file_in)){
-		std::cout<<"error loading" << file_in<<std::endl;
-		system("pause");
-		exit(0);
-	}
-
-	FREE_IMAGE_TYPE originalType = input.getImageType();
-	if (!input.convertTo24Bits()){
-		std::cout<<"error loading" << file_in<<std::endl;
-		system("pause");
-		exit(0);
-	}
-
-	//load original image pixel data
-	std::vector<cl_float3> pixels;
-	pixels.resize(input.getWidth() * input.getHeight());
-	for(unsigned int i = 0; i< input.getWidth(); ++i){
-		for(unsigned int j = 0;j<input.getHeight(); ++j){
-			cl_float3 temp;
-			byte colors[4];
-			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
-			temp.x = colors[0];
-			temp.y = colors[1];
-			temp.z = colors[2];
-
-			pixels[j * input.getWidth() + i];
-		}
-	}
-
-	#ifdef FREEIMAGE_LIB
-	FreeImage_Uninitialise();
-	#endif
-
-	return pixels;
-}
-
 
 /*
  * main execution routine
@@ -856,8 +867,8 @@ int _tmain(int argc, TCHAR* argv[])
     LARGE_INTEGER performanceCountNDRangeStart;
     LARGE_INTEGER performanceCountNDRangeStop;
 
-    cl_uint arrayWidth  = 1024;
-    cl_uint arrayHeight = 1024;
+    cl_uint arrayWidth  = 300;
+    cl_uint arrayHeight = 300;
 
     //initialize Open CL objects (context, queue, etc.)
     if (CL_SUCCESS != SetupOpenCL(&ocl, deviceType))
@@ -924,7 +935,7 @@ int _tmain(int argc, TCHAR* argv[])
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
     // Execute (enqueue) the kernel
-    if (CL_SUCCESS != ExecuteAddKernel(&ocl, arrayWidth, arrayHeight))
+    if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
     {
         return -1;
     }

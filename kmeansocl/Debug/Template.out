@@ -10,9 +10,9 @@ Linking started
 Linking done
 Device build started
 Device build done
-Kernel <Add> was successfully vectorized (4)
+Kernel <Kmeans> was successfully vectorized (4)
 Done.
-Add info:
+Kmeans info:
 	Maximum work-group size: 8192
 	Compiler work-group size: (0, 0, 0)
 	Local memory size: 0
