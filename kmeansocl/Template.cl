@@ -24,7 +24,7 @@
 	return sqrt(pow(p.x-c.x,2)+pow(p.y-c.y,2)+pow(p.z-c.z,2));
 }
 
-__kernel void Kmeans(__global float4* pA, __global float3* pB, __global float4* pC)
+__kernel void Kmeans(__global float4* pA, __local float3* pB, __global float4* pC)
 {
 	const int CENTROID_COUNT = 5;
     const int x     = get_global_id(0);
