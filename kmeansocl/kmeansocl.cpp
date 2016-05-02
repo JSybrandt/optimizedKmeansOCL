@@ -47,20 +47,6 @@
 //hardcode centroid count here
 const int CENTROID_COUNT = 5;
 
-//structs...centroid and pixel
-struct centroid {
-	float r;
-	float g;
-	float b;
-};
-
-struct pixel {
-	float r;
-	float g;
-	float b;
-	int cluster;
-};
-
 /* This function helps to create informative messages in
  * case when OpenCL errors occur. It returns a string
  * representation for an OpenCL error code.
@@ -164,9 +150,10 @@ struct ocl_args_d_t
     float            compilerVersion;   // hold the device OpenCL C version (default. 1.2)
     
     // Objects that are specific for algorithm implemented in this sample
-    cl_mem           srcA;              // hold first source buffer
-    cl_mem           srcB;              // hold second source buffer
-    cl_mem           dstMem;            // hold destination buffer
+    cl_mem           pixelsIn;              // hold first source buffer
+    cl_mem           scratchIn;              // hold second source buffer
+    cl_mem           pixelsOut;            // hold destination buffer
+	cl_mem	centroidsIn;
 };
 
 ocl_args_d_t::ocl_args_d_t():
@@ -178,9 +165,11 @@ ocl_args_d_t::ocl_args_d_t():
         platformVersion(OPENCL_VERSION_1_2),
         deviceVersion(OPENCL_VERSION_1_2),
         compilerVersion(OPENCL_VERSION_1_2),
-        srcA(NULL),
-        srcB(NULL),
-        dstMem(NULL)
+        pixelsIn(NULL),
+        scratchIn(NULL),
+        centroidsIn(NULL),
+		pixelsOut(NULL)
+
 {
 }
 
@@ -215,25 +204,33 @@ ocl_args_d_t::~ocl_args_d_t()
             LogError("Error: clReleaseProgram returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (srcA)
+    if (pixelsIn)
     {
-        err = clReleaseMemObject(srcA);
+        err = clReleaseMemObject(pixelsIn);
         if (CL_SUCCESS != err)
         {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (srcB)
+    if (scratchIn)
     {
-        err = clReleaseMemObject(srcB);
+        err = clReleaseMemObject(scratchIn);
         if (CL_SUCCESS != err)
         {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (dstMem)
+    if (pixelsOut)
     {
-        err = clReleaseMemObject(dstMem);
+        err = clReleaseMemObject(pixelsOut);
+        if (CL_SUCCESS != err)
+        {
+            LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
+        }
+    }
+	if (centroidsIn)
+    {
+        err = clReleaseMemObject(centroidsIn);
         if (CL_SUCCESS != err)
         {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
@@ -678,7 +675,7 @@ Finish:
  * Create OpenCL buffers from host memory
  * These buffers will be used later by the OpenCL kernel
  */
-int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* inputB, cl_float4* outputC, cl_uint arrayWidth, cl_uint arrayHeight)
+int CreateBufferArguments(ocl_args_d_t *ocl, cl_float3* pixelsIn, cl_float4* scratchIn, cl_float3* pixelsOut, cl_float3* centroidsIn, cl_uint arrayWidth, cl_uint arrayHeight)
 {
     cl_int err = CL_SUCCESS;
 
@@ -688,17 +685,23 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* input
     // to better organize data copying.
     // You use CL_MEM_COPY_HOST_PTR here, because the buffers should be populated with bytes at inputA and inputB.
 
-    ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_float4) * arrayWidth * arrayHeight, inputA, &err);
+    ocl->pixelsIn = clCreateBuffer(ocl->context, CL_MEM_COPY_HOST_PTR, sizeof(cl_float3) * arrayWidth * arrayHeight, pixelsIn, &err);
     if (CL_SUCCESS != err)
     {
-        LogError("Error: clCreateBuffer for srcA returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: clCreateBuffer for pixels returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_float3) * CENTROID_COUNT, inputB, &err);
+    ocl->scratchIn = clCreateBuffer(ocl->context, CL_MEM_COPY_HOST_PTR, sizeof(cl_float4)* arrayWidth * arrayHeight * CENTROID_COUNT, scratchIn, &err);
     if (CL_SUCCESS != err)
     {
-        LogError("Error: clCreateBuffer for srcB returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: clCreateBuffer for scratch returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+	ocl->centroidsIn = clCreateBuffer(ocl->context, CL_MEM_COPY_HOST_PTR, sizeof(cl_float3)* CENTROID_COUNT, centroidsIn, &err);
+    if (CL_SUCCESS != err)
+    {
+        LogError("Error: clCreateBuffer for centroids returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
@@ -706,7 +709,7 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float4* inputA, cl_float3* input
     // then, depending on the OpenCL runtime implementation and hardware capabilities, 
     // it may save you not necessary data copying.
     // As it is known that output buffer will be write only, you explicitly declare it using CL_MEM_WRITE_ONLY.
-    ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float4) * arrayWidth * arrayHeight, outputC, &err);
+    ocl->pixelsOut = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float3) * arrayWidth * arrayHeight, pixelsOut, &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateBuffer for dstMem returned %s\n", TranslateOpenCLError(err));
@@ -725,26 +728,35 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl)
 {
     cl_int err = CL_SUCCESS;
 
-    err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->srcA);
+    err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->pixelsIn);
     if (CL_SUCCESS != err)
     {
-        LogError("error: Failed to set argument srcA, returned %s\n", TranslateOpenCLError(err));
+        LogError("error: Failed to set argument pixelsIn, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    err  = clSetKernelArg(ocl->kernel, 1, sizeof(cl_mem), (void *)&ocl->srcB);
+	
+    err  = clSetKernelArg(ocl->kernel, 1, sizeof(cl_mem), (void *)&ocl->scratchIn);
     if (CL_SUCCESS != err)
     {
-        LogError("Error: Failed to set argument srcB, returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: Failed to set argument ScratchIn, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    err  = clSetKernelArg(ocl->kernel, 2, sizeof(cl_mem), (void *)&ocl->dstMem);
+    err  = clSetKernelArg(ocl->kernel, 2, sizeof(cl_mem), (void *)&ocl->pixelsOut);
     if (CL_SUCCESS != err)
     {
-        LogError("Error: Failed to set argument dstMem, returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: Failed to set argument pixelsOut, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
+
+	err  = clSetKernelArg(ocl->kernel, 3, sizeof(cl_mem), (void *)&ocl->centroidsIn);
+    if (CL_SUCCESS != err)
+    {
+        LogError("Error: Failed to set argument centroidsIn, returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+
 
     return err;
 }
@@ -781,50 +793,6 @@ cl_uint ExecuteKmeansKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
 }
 
 
-void moveCentroids(cl_float4* pixels, cl_float3* centroids, int arrayWidth, int arrayHeight){
-	int count[CENTROID_COUNT];
-	cl_float3 valueSum[CENTROID_COUNT];
-	//init
-	for(int i = 0 ; i < CENTROID_COUNT; i++){ 
-		count[i]=0;
-		valueSum[i].x=valueSum[i].y=valueSum[i].z=0;
-	}
-	//for each pixel
-	for(int i = 0; i<arrayWidth*arrayHeight; ++i){
-		//this pixel's label
-		int c = pixels[i].w;
-		//tally
-		count[c]++;
-		//sum value
-		valueSum[c].x +=  pixels[i].x;
-		valueSum[c].y +=  pixels[i].y;
-		valueSum[c].z +=  pixels[i].z;
-	}
-	//move centroids
-	for(int i = 0 ; i < CENTROID_COUNT; i++){ 
-		centroids[i].x = valueSum[i].x / count[i];
-		centroids[i].y = valueSum[i].y / count[i];
-		centroids[i].z = valueSum[i].z / count[i];
-	}
-}
-
-bool convergence(cl_float3* group1, cl_float3* group2){
-	for(int i = 0 ; i < CENTROID_COUNT; ++i){
-		if(abs(group1[i].x - group2[i].x) > 0.0000001) return false;
-		if(abs(group1[i].y - group2[i].y) > 0.0000001) return false;
-		if(abs(group1[i].z - group2[i].z) > 0.0000001) return false;
-	}
-	return true;
-}
-
-void assignFinalPixelColors(cl_float4* pixels, cl_float3* centroids, int arrayWidth, int arrayHeight){
-	for (int i = 0;i<arrayWidth*arrayHeight;i++){
-		pixels[i].x = centroids[(int)pixels[i].w].x;
-		pixels[i].y = centroids[(int)pixels[i].w].y;
-		pixels[i].z = centroids[(int)pixels[i].w].z;
-	}
-}
-
 /*
  * main execution routine
  * Basically it consists of three parts:
@@ -860,29 +828,32 @@ int _tmain(int argc, TCHAR* argv[])
     // allocate working buffers. 
     // the buffer should be aligned with 4K page and size should fit 64-byte cached line
 	//size for pixels
-    cl_uint optimizedSizeA =  ((sizeof(cl_float4) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
-	//size for centroids
-	cl_uint optimizedSizeB =  ((sizeof(cl_float3) * CENTROID_COUNT - 1)/64 + 1) * 64;
+    cl_uint imgSize =  ((sizeof(cl_float3) * arrayWidth * arrayHeight - 1)/64 + 1) * 64;
+	cl_uint scratchSize =  ((sizeof(cl_float4) * arrayWidth * arrayHeight*CENTROID_COUNT - 1)/64 + 1) * 64;
+	cl_uint centroidsSize =  ((sizeof(cl_float3) * CENTROID_COUNT - 1)/64 + 1) * 64;
 
-	//for(optimizedSizeA; optimizedSizeA < sizeof(cl_float4) * arrayWidth * arrayHeight; optimizedSizeA*=2);
-	//for(optimizedSizeB; optimizedSizeB < sizeof(cl_float3) * CENTROID_COUNT; optimizedSizeB*=21);
 
-    cl_float4* inputA  = (cl_float4*)_aligned_malloc(optimizedSizeA,4096);//pixels
-    cl_float3* inputB  = (cl_float3*)_aligned_malloc(optimizedSizeB,4096);//centroids
-    if (NULL == inputA || NULL == inputB)
+    cl_float3* pixelsIn  = (cl_float3*)_aligned_malloc(imgSize,4096);
+    cl_float4* scratchIn  = (cl_float4*)_aligned_malloc(scratchSize,4096);
+	cl_float3* centroidsIn  = (cl_float3*)_aligned_malloc(centroidsSize,4096);
+	cl_float3* pixelsOut  = (cl_float3*)_aligned_malloc(imgSize,4096);
+
+    if (NULL == pixelsIn || NULL == scratchIn || NULL == centroidsIn)
     {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
         return -1;
     }
 
     //random input
-    generateInput(inputImg,inputA, arrayWidth, arrayHeight);
-    generateCentroids(inputB, CENTROID_COUNT);
+    generateInput(inputImg,pixelsIn, arrayWidth, arrayHeight);
+    generateCentroids(centroidsIn, CENTROID_COUNT);
+	for(int i = 0 ; i < arrayWidth*arrayHeight*CENTROID_COUNT;i++)
+		scratchIn[i].x=scratchIn[i].y=scratchIn[i].z=scratchIn[i].w=0;
 
 
     // Create OpenCL buffers from host memory
     // These buffers will be used later by the OpenCL kernel
-    if (CL_SUCCESS != CreateBufferArguments(&ocl, inputA, inputB, inputA, arrayWidth, arrayHeight))
+    if (CL_SUCCESS != CreateBufferArguments(&ocl, pixelsIn, scratchIn, pixelsOut, scratchIn, arrayWidth, arrayHeight))
     {
         return -1;
     }
@@ -923,27 +894,12 @@ int _tmain(int argc, TCHAR* argv[])
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
 
-	cl_float3 oldCentroids[CENTROID_COUNT];
-	do{
-		for(int i = 0 ; i < CENTROID_COUNT; i++)
-			oldCentroids[i] = inputB[i];
-
-		 // Execute (enqueue) the kernel (labels)
-		if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
-		{
-			return -1;
-		}
-
-		moveCentroids(inputA,inputB,arrayWidth,arrayHeight);
-
-	}while(!convergence(inputB,oldCentroids));
-
-
-   
-
-
-
-
+	
+	// Execute (enqueue) the kernel (labels)
+	if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
+	{
+		return -1;
+	}
 
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStop);
@@ -956,8 +912,6 @@ int _tmain(int argc, TCHAR* argv[])
             1000.0f*(float)(performanceCountNDRangeStop.QuadPart - performanceCountNDRangeStart.QuadPart) / (float)perfFrequency.QuadPart);
     }
 
-	assignFinalPixelColors(inputA, inputB, arrayWidth,arrayHeight);
-
 	//write image
 	//allocate output image
 	fipImage output(FIT_BITMAP, inputImg.getWidth(), inputImg.getHeight(), 24);
@@ -965,9 +919,9 @@ int _tmain(int argc, TCHAR* argv[])
 	for(unsigned int i = 0; i < output.getWidth(); ++i) {
 		for(unsigned int j = 0; j < output.getHeight(); ++j) {
 			byte colors[4];
-			colors[0] = static_cast<byte>(inputA[j * output.getWidth() + i].z * 255);
-			colors[1] = static_cast<byte>(inputA[j * output.getWidth() + i].y * 255);
-			colors[2] = static_cast<byte>(inputA[j * output.getWidth() + i].x * 255);
+			colors[0] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].z * 255);
+			colors[1] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].y * 255);
+			colors[2] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].x * 255);
 			
 			output.setPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
 		}
@@ -983,8 +937,10 @@ int _tmain(int argc, TCHAR* argv[])
 		return 1;
 	}
 
-    _aligned_free(inputA);
-    _aligned_free(inputB);
+    _aligned_free(pixelsIn);
+    _aligned_free(scratchIn);
+	_aligned_free(centroidsIn);
+	_aligned_free(pixelsOut);
 
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Uninitialise();
