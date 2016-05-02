@@ -24,6 +24,17 @@
 	return sqrt(pow(p.x-c.x,2)+pow(p.y-c.y,2)+pow(p.z-c.z,2));
 }
 
+bool conv(__local float3* c1, __local float3*c2){
+	float acc = 0;
+	int i;
+	for(i=0;i<5;i++){
+		acc += fabs(c1[i].x-c2[i].x);
+		acc += fabs(c1[i].y-c2[i].y);
+		acc += fabs(c1[i].z-c2[i].z);
+	}
+	return acc < 0.0001;
+}
+
 //pixels x-r y-g z-b w-label
 //centroid x-r y-g z-b
 //centroidScratch index-centroid x-r y-b z-g w-count 
@@ -41,12 +52,17 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 	int i = 0;
 	float3 currPix = pixels[id]; 
 	__local float3 centroids[5];
+	__local float3 oldCentroids[5];
 	if(lid<CENTROID_COUNT){
 		centroids[lid] = GLOBALcentroids[lid];
 	}
 
-	int blah = 10;
 	do{
+		barrier(CLK_GLOBAL_MEM_FENCE);
+		
+		if(lid<CENTROID_COUNT){
+			oldCentroids[lid]=centroids[lid];	
+		}
 
 		barrier(CLK_GLOBAL_MEM_FENCE);
 
@@ -59,18 +75,16 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 				label = i;
 			 }
 		}
-
-		break;
-
+		
+		barrier(CLK_GLOBAL_MEM_FENCE);
 		//prepare scratch
 		for(i=0;i<CENTROID_COUNT;i++){
 			centroidScratch[id*CENTROID_COUNT+i] = (float4)(0.0f,0.0f,0.0f,0.0f);
 		}
 		centroidScratch[id*CENTROID_COUNT+label] = (float4)(currPix.x,currPix.y,currPix.z,1.0f);
-
+		
 		//reduce
 		
-
 		/*
 		halfSize--;
 		halfSize |= halfSize>>1;
@@ -90,7 +104,7 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 				}
 			}
 		}
-
+		barrier(CLK_GLOBAL_MEM_FENCE);
 		if(id<CENTROID_COUNT){
 			temp = centroidScratch[id];
 			temp.x /= temp.w;
@@ -106,8 +120,8 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 			temp = centroidScratch[lid];
 			centroids[lid] = (float3)(temp.x,temp.y,temp.z);
 		}
-		blah--;
-	}while(blah>0);
+		barrier(CLK_GLOBAL_MEM_FENCE);
+	}while(!conv(oldCentroids,centroids));
 	output[id]=centroids[label];
 	//output[id].x = label*50;
 	//output[id].y = label*50;

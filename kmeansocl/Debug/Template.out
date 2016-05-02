@@ -13,12 +13,12 @@ Linking started
 Linking done
 Device build started
 Device build done
-Kernel <Kmeans> was successfully vectorized (8)
+Kernel <Kmeans> was not vectorized
 Done.
 Kmeans info:
 	Maximum work-group size: 2048
 	Compiler work-group size: (0, 0, 0)
-	Local memory size: 128
+	Local memory size: 256
 	Preferred multiple of work-group size: 128
 	Minimum amount of private memory: 128
 
