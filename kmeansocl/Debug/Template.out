@@ -8,13 +8,12 @@ Compilation started
 C:\Users\SybrandtJG1\Desktop\optimizedKmeansOCL\kmeansocl\Template.cl(24,27) :warning CL : implicit conversion from integral type to floating point type for overloadable function might lead to ambiguity
 C:\Users\SybrandtJG1\Desktop\optimizedKmeansOCL\kmeansocl\Template.cl(24,42) :warning CL : implicit conversion from integral type to floating point type for overloadable function might lead to ambiguity
 C:\Users\SybrandtJG1\Desktop\optimizedKmeansOCL\kmeansocl\Template.cl(24,57) :warning CL : implicit conversion from integral type to floating point type for overloadable function might lead to ambiguity
-C:\Users\SybrandtJG1\Desktop\optimizedKmeansOCL\kmeansocl\Template.cl(58,7) :warning CL : expression result unused
 Compilation done
 Linking started
 Linking done
 Device build started
 Device build done
-Kernel <Kmeans> was not vectorized
+Kernel <Kmeans> was successfully vectorized (8)
 Done.
 Kmeans info:
 	Maximum work-group size: 2048

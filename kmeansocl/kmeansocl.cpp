@@ -479,7 +479,7 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
 /*
  * Generate random value for input buffers
  */
-void generateInput(fipImage& input, cl_float4* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
+void generateInput(fipImage& input, cl_float3* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
 {
 
 	char * file_in = "test.jpg";
@@ -504,10 +504,9 @@ void generateInput(fipImage& input, cl_float4* inputArray, cl_uint arrayWidth, c
 		for(unsigned int j = 0;j<input.getHeight(); ++j){
 			byte colors[4];
 			input.getPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
-			inputArray[j*input.getWidth()+i].x = colors[0]/ 255.0f;;
-			inputArray[j*input.getWidth()+i].y = colors[1]/ 255.0f;;
-			inputArray[j*input.getWidth()+i].z = colors[2]/ 255.0f;;
-			inputArray[j*input.getWidth()+i].w = -1;
+			inputArray[j*input.getWidth()+i].x = colors[0]/ 255.0f;
+			inputArray[j*input.getWidth()+i].y = colors[1]/ 255.0f;
+			inputArray[j*input.getWidth()+i].z = colors[2]/ 255.0f;
 		}
 	}
 
@@ -698,7 +697,7 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float3* pixelsIn, cl_float4* scr
         LogError("Error: clCreateBuffer for scratch returned %s\n", TranslateOpenCLError(err));
         return err;
     }
-	ocl->centroidsIn = clCreateBuffer(ocl->context, CL_MEM_COPY_HOST_PTR, sizeof(cl_float3)* CENTROID_COUNT, centroidsIn, &err);
+	ocl->centroidsIn = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR, sizeof(cl_float3)* CENTROID_COUNT, centroidsIn, &err);
     if (CL_SUCCESS != err)
     {
         LogError("Error: clCreateBuffer for centroids returned %s\n", TranslateOpenCLError(err));
@@ -847,13 +846,21 @@ int _tmain(int argc, TCHAR* argv[])
     //random input
     generateInput(inputImg,pixelsIn, arrayWidth, arrayHeight);
     generateCentroids(centroidsIn, CENTROID_COUNT);
+	for(int i = 0 ; i < CENTROID_COUNT;i++){
+		std::cout<<i<<":"<<centroidsIn[i].x<<":"<<centroidsIn[i].y<<":"<<centroidsIn[i].z<<std::endl;
+	}
 	for(int i = 0 ; i < arrayWidth*arrayHeight*CENTROID_COUNT;i++)
 		scratchIn[i].x=scratchIn[i].y=scratchIn[i].z=scratchIn[i].w=0;
+
+	for(int i = 0 ; i < arrayWidth*arrayHeight; i++){
+		pixelsOut[i].x=pixelsOut[i].y=pixelsOut[i].z=1;
+		pixelsOut[i].y=0;
+	}
 
 
     // Create OpenCL buffers from host memory
     // These buffers will be used later by the OpenCL kernel
-    if (CL_SUCCESS != CreateBufferArguments(&ocl, pixelsIn, scratchIn, pixelsOut, scratchIn, arrayWidth, arrayHeight))
+    if (CL_SUCCESS != CreateBufferArguments(&ocl, pixelsIn, scratchIn, pixelsOut, centroidsIn, arrayWidth, arrayHeight))
     {
         return -1;
     }
@@ -919,9 +926,9 @@ int _tmain(int argc, TCHAR* argv[])
 	for(unsigned int i = 0; i < output.getWidth(); ++i) {
 		for(unsigned int j = 0; j < output.getHeight(); ++j) {
 			byte colors[4];
-			colors[0] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].z * 255);
+			colors[0] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].x * 255);
 			colors[1] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].y * 255);
-			colors[2] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].x * 255);
+			colors[2] = static_cast<byte>(pixelsOut[j * output.getWidth() + i].z * 255);
 			
 			output.setPixelColor(i, j, reinterpret_cast<RGBQUAD*>(colors));
 		}
