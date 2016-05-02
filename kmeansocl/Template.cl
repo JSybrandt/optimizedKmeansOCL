@@ -56,16 +56,12 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 	if(lid<CENTROID_COUNT){
 		centroids[lid] = GLOBALcentroids[lid];
 	}
-
 	do{
 		barrier(CLK_GLOBAL_MEM_FENCE);
-		
 		if(lid<CENTROID_COUNT){
 			oldCentroids[lid]=centroids[lid];	
 		}
-
 		barrier(CLK_GLOBAL_MEM_FENCE);
-
 		//LABEL
 		minVal = 9999;
 		for(i=0; i < CENTROID_COUNT; i++){
@@ -75,27 +71,13 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 				label = i;
 			 }
 		}
-		
 		barrier(CLK_GLOBAL_MEM_FENCE);
 		//prepare scratch
 		for(i=0;i<CENTROID_COUNT;i++){
 			centroidScratch[id*CENTROID_COUNT+i] = (float4)(0.0f,0.0f,0.0f,0.0f);
 		}
 		centroidScratch[id*CENTROID_COUNT+label] = (float4)(currPix.x,currPix.y,currPix.z,1.0f);
-		
 		//reduce
-		
-		/*
-		halfSize--;
-		halfSize |= halfSize>>1;
-		halfSize |= halfSize>>2;
-		halfSize |= halfSize>>4;
-		halfSize |= halfSize>>8;
-		halfSize |= halfSize>>16;
-		halfSize++;
-		//halfsize is the next largest power of 2
-		*/
-
 		for(halfSize=numThreads/2;halfSize>0;halfSize>>=1){
 			barrier(CLK_GLOBAL_MEM_FENCE);
 			if(id<halfSize && (id+halfSize) < numThreads){
@@ -113,8 +95,6 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 			centroidScratch[id] = temp;
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
-
-
 		//load moved centroids to local
 		if(lid<CENTROID_COUNT){
 			temp = centroidScratch[lid];
@@ -123,9 +103,6 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}while(!conv(oldCentroids,centroids));
 	output[id]=centroids[label];
-	//output[id].x = label*50;
-	//output[id].y = label*50;
-	//output[id].z = label*50;
 }
 
 

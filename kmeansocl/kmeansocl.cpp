@@ -846,9 +846,6 @@ int _tmain(int argc, TCHAR* argv[])
     //random input
     generateInput(inputImg,pixelsIn, arrayWidth, arrayHeight);
     generateCentroids(centroidsIn, CENTROID_COUNT);
-	for(int i = 0 ; i < CENTROID_COUNT;i++){
-		std::cout<<i<<":"<<centroidsIn[i].x<<":"<<centroidsIn[i].y<<":"<<centroidsIn[i].z<<std::endl;
-	}
 	for(int i = 0 ; i < arrayWidth*arrayHeight*CENTROID_COUNT;i++)
 		scratchIn[i].x=scratchIn[i].y=scratchIn[i].z=scratchIn[i].w=0;
 
