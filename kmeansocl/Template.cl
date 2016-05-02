@@ -32,7 +32,7 @@ bool conv(__local float3* c1, __local float3*c2){
 		acc += fabs(c1[i].y-c2[i].y);
 		acc += fabs(c1[i].z-c2[i].z);
 	}
-	return acc < 0.0001;
+	return acc < 0.000001;
 }
 
 //pixels x-r y-g z-b w-label
@@ -76,6 +76,7 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 		for(i=0;i<CENTROID_COUNT;i++){
 			centroidScratch[id*CENTROID_COUNT+i] = (float4)(0.0f,0.0f,0.0f,0.0f);
 		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
 		centroidScratch[id*CENTROID_COUNT+label] = (float4)(currPix.x,currPix.y,currPix.z,1.0f);
 		//reduce
 		for(halfSize=numThreads/2;halfSize>0;halfSize>>=1){
@@ -102,6 +103,7 @@ __kernel void Kmeans(__global float3* pixels, __global float4* centroidScratch, 
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}while(!conv(oldCentroids,centroids));
+	barrier(CLK_GLOBAL_MEM_FENCE);
 	output[id]=centroids[label];
 }
 

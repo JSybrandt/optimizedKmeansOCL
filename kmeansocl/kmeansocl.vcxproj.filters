@@ -24,6 +24,9 @@
     <ClCompile Include="kmeansocl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="StopWatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FreeImagePlus.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="StopWatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

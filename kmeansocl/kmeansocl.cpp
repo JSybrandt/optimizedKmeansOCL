@@ -20,6 +20,7 @@
  * problem reports or change requests be submitted to it directly
  *****************************************************************************/
 
+#include "StopWatch.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <tchar.h>
@@ -801,6 +802,7 @@ cl_uint ExecuteKmeansKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
  */
 int _tmain(int argc, TCHAR* argv[])
 {
+
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Initialise();
 	#endif
@@ -898,12 +900,16 @@ int _tmain(int argc, TCHAR* argv[])
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
 
-	
+	StopWatch timer;
+	timer.start();
 	// Execute (enqueue) the kernel (labels)
 	if (CL_SUCCESS != ExecuteKmeansKernel(&ocl, arrayWidth, arrayHeight))
 	{
 		return -1;
 	}
+
+	double time = timer.stop();
+	std::cout<<"Time:"<<time<<std::endl;
 
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStop);
@@ -949,6 +955,9 @@ int _tmain(int argc, TCHAR* argv[])
 	#ifdef FREEIMAGE_LIB
 	FreeImage_Uninitialise();
 	#endif
+
+	system("PAUSE");
+	
 
     return 0;
 }
